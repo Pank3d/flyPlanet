@@ -59,8 +59,19 @@ jobs:
             # Генерация ключей REALITY
             echo "=== Generating REALITY keys ==="
             KEYS=$(xray x25519)
-            PRIVATE_KEY=$(echo "$KEYS" | grep "Private key:" | awk '{print $3}')
-            PUBLIC_KEY=$(echo "$KEYS" | grep "Public key:" | awk '{print $3}')
+            echo "Raw keys output: $KEYS"
+
+            # Новый формат вывода xray x25519: PrivateKey / Password (PublicKey)
+            PRIVATE_KEY=$(echo "$KEYS" | grep "PrivateKey:" | awk '{print $2}')
+            PUBLIC_KEY=$(echo "$KEYS" | grep "Password:" | awk '{print $2}')
+
+            # Если не нашли в новом формате, пробуем старый формат
+            if [ -z "$PRIVATE_KEY" ]; then
+              PRIVATE_KEY=$(echo "$KEYS" | grep "Private key:" | awk '{print $3}')
+            fi
+            if [ -z "$PUBLIC_KEY" ]; then
+              PUBLIC_KEY=$(echo "$KEYS" | grep "Public key:" | awk '{print $3}')
+            fi
 
             # Проверка что ключи сгенерированы
             if [ -z "$PRIVATE_KEY" ] || [ -z "$PUBLIC_KEY" ]; then
