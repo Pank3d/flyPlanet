@@ -1,0 +1,15 @@
+.env
+.env.local
+reality_server_info.json
+users_batch.json
+xray_config.json
+
+node_modules/
+*.log
+
+__pycache__/
+*.pyc
+
+.vscode/
+.idea/
+.DS_Store

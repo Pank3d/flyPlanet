@@ -1,0 +1,16 @@
+{
+  "name": "vless-reality-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for VLESS + REALITY configs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.64.0",
+    "telegra.ph": "^1.0.1",
+    "uuid": "^9.0.1",
+    "qrcode": "^1.5.3",
+    "dotenv": "^16.3.1"
+  }
+}

@@ -1,0 +1,199 @@
+name: Deploy VLESS Reality Stack
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  VPS_HOST: ${{ secrets.VPS_HOST }}
+  VPS_USER: ${{ secrets.VPS_USER }}
+  VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+  VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+  REALITY_DEST: ${{ secrets.REALITY_DEST || 'yandex.ru' }}
+  REALITY_SNI: ${{ secrets.REALITY_SNI || 'yandex.ru ya.ru' }}
+  BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+
+jobs:
+  deploy-xray:
+    name: Deploy Xray Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install paramiko
+
+      - name: Deploy Xray to VPS
+        id: deploy_xray
+        run: |
+          cd server
+          python deploy.py \
+            --host ${{ env.VPS_HOST }} \
+            --port ${{ env.VPS_PORT }} \
+            --user ${{ env.VPS_USER }} \
+            --password "${{ env.VPS_PASSWORD }}" \
+            --dest ${{ env.REALITY_DEST }} \
+            --sni ${{ env.REALITY_SNI }} \
+            --alias "Reality-Server"
+
+      - name: Extract server info
+        id: extract
+        run: |
+          if [ -f reality_server_info.json ]; then
+            PUBLIC_KEY=$(jq -r '.public_key' reality_server_info.json)
+            SERVER_IP=$(jq -r '.server' reality_server_info.json)
+            echo "public_key=$PUBLIC_KEY" >> $GITHUB_OUTPUT
+            echo "server_ip=$SERVER_IP" >> $GITHUB_OUTPUT
+
+            # Save for next job
+            echo "PUBLIC_KEY=$PUBLIC_KEY" >> $GITHUB_ENV
+            echo "SERVER_IP=$SERVER_IP" >> $GITHUB_ENV
+          fi
+
+      - name: Upload server info
+        uses: actions/upload-artifact@v3
+        with:
+          name: server-info
+          path: reality_server_info.json
+          retention-days: 30
+
+  deploy-bot:
+    name: Deploy Telegram Bot
+    runs-on: ubuntu-latest
+    needs: deploy-xray
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download server info
+        uses: actions/download-artifact@v3
+        with:
+          name: server-info
+        continue-on-error: true
+
+      - name: Extract credentials
+        id: extract
+        run: |
+          if [ -f reality_server_info.json ]; then
+            PUBLIC_KEY=$(jq -r '.public_key' reality_server_info.json)
+            SERVER_IP=$(jq -r '.server' reality_server_info.json)
+          else
+            PUBLIC_KEY="${{ secrets.XRAY_PUBLIC_KEY }}"
+            SERVER_IP="${{ env.VPS_HOST }}"
+          fi
+
+          echo "public_key=$PUBLIC_KEY" >> $GITHUB_OUTPUT
+          echo "server_ip=$SERVER_IP" >> $GITHUB_OUTPUT
+
+      - name: Deploy bot to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          BOT_TOKEN: ${{ env.BOT_TOKEN }}
+          SERVER_IP: ${{ steps.extract.outputs.server_ip }}
+          PUBLIC_KEY: ${{ steps.extract.outputs.public_key }}
+        with:
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ env.VPS_PASSWORD }}
+          port: ${{ env.VPS_PORT }}
+          envs: BOT_TOKEN,SERVER_IP,PUBLIC_KEY
+          script: |
+            set -e
+
+            # Install Node.js
+            if ! command -v node &> /dev/null; then
+              curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+              apt-get install -y nodejs
+            fi
+
+            # Install PM2
+            if ! command -v pm2 &> /dev/null; then
+              npm install -g pm2
+            fi
+
+            # Stop existing bot
+            pm2 stop vless-bot 2>/dev/null || true
+            pm2 delete vless-bot 2>/dev/null || true
+
+            # Create directory
+            mkdir -p ~/vless-reality-bot
+            cd ~/vless-reality-bot
+            rm -rf *
+
+      - name: Copy bot files
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ env.VPS_PASSWORD }}
+          port: ${{ env.VPS_PORT }}
+          source: "bot/*"
+          target: "~/vless-reality-bot"
+          strip_components: 1
+
+      - name: Start bot
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          BOT_TOKEN: ${{ env.BOT_TOKEN }}
+          SERVER_IP: ${{ steps.extract.outputs.server_ip }}
+          PUBLIC_KEY: ${{ steps.extract.outputs.public_key }}
+        with:
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ env.VPS_PASSWORD }}
+          port: ${{ env.VPS_PORT }}
+          envs: BOT_TOKEN,SERVER_IP,PUBLIC_KEY
+          script: |
+            cd ~/vless-reality-bot
+
+            # Install dependencies
+            npm ci --production
+
+            # Create .env
+            cat > .env << EOF
+            BOT_TOKEN=${BOT_TOKEN}
+            SERVER_IP=${SERVER_IP}
+            PUBLIC_KEY=${PUBLIC_KEY}
+            EOF
+
+            # Start with PM2
+            pm2 start index.js --name vless-bot
+            pm2 save
+            pm2 startup systemd -u root --hp /root
+
+            echo "Bot started successfully"
+
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: [deploy-xray, deploy-bot]
+    if: always() && secrets.NOTIFICATION_CHAT_ID != ''
+
+    steps:
+      - name: Send Telegram notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.NOTIFICATION_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            Deployment completed
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+
+            Xray: ${{ needs.deploy-xray.result }}
+            Bot: ${{ needs.deploy-bot.result }}
+
+            Server: ${{ secrets.VPS_HOST }}
