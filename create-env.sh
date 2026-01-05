@@ -26,10 +26,22 @@ if [ -n "$1" ]; then
     BOT_TOKEN="$1"
 fi
 
-# Извлекаем данные из JSON
-PUBLIC_KEY=$(cat ~/xray-info/reality_server_info.json | grep -o '"public_key":"[^"]*"' | cut -d'"' -f4)
-SERVER_IP=$(cat ~/xray-info/reality_server_info.json | grep -o '"server":"[^"]*"' | cut -d'"' -f4)
-SHORT_ID=$(cat ~/xray-info/reality_server_info.json | grep -o '"short_id":"[^"]*"' | cut -d'"' -f4)
+# Извлекаем данные из JSON используя разные методы
+# Метод 1: grep с sed (более надежный)
+PUBLIC_KEY=$(grep '"public_key"' ~/xray-info/reality_server_info.json | sed 's/.*"public_key"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+SERVER_IP=$(grep '"server"' ~/xray-info/reality_server_info.json | sed 's/.*"server"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+SHORT_ID=$(grep '"short_id"' ~/xray-info/reality_server_info.json | sed 's/.*"short_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+
+# Если sed не сработал, пробуем через awk
+if [ -z "$PUBLIC_KEY" ]; then
+    PUBLIC_KEY=$(awk -F'"' '/"public_key"/{print $4}' ~/xray-info/reality_server_info.json)
+fi
+if [ -z "$SERVER_IP" ]; then
+    SERVER_IP=$(awk -F'"' '/"server"/{print $4}' ~/xray-info/reality_server_info.json)
+fi
+if [ -z "$SHORT_ID" ]; then
+    SHORT_ID=$(awk -F'"' '/"short_id"/{print $4}' ~/xray-info/reality_server_info.json)
+fi
 
 # Проверяем что все значения получены
 if [ -z "$PUBLIC_KEY" ]; then
