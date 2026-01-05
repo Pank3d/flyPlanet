@@ -31,6 +31,7 @@ fi
 PUBLIC_KEY=$(grep '"public_key"' ~/xray-info/reality_server_info.json | sed 's/.*"public_key"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 SERVER_IP=$(grep '"server"' ~/xray-info/reality_server_info.json | sed 's/.*"server"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 SHORT_ID=$(grep '"short_id"' ~/xray-info/reality_server_info.json | sed 's/.*"short_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+SERVER_UUID=$(grep '"uuid"' ~/xray-info/reality_server_info.json | sed 's/.*"uuid"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 
 # Если sed не сработал, пробуем через awk
 if [ -z "$PUBLIC_KEY" ]; then
@@ -41,6 +42,9 @@ if [ -z "$SERVER_IP" ]; then
 fi
 if [ -z "$SHORT_ID" ]; then
     SHORT_ID=$(awk -F'"' '/"short_id"/{print $4}' ~/xray-info/reality_server_info.json)
+fi
+if [ -z "$SERVER_UUID" ]; then
+    SERVER_UUID=$(awk -F'"' '/"uuid"/{print $4}' ~/xray-info/reality_server_info.json)
 fi
 
 # Проверяем что все значения получены
@@ -59,6 +63,11 @@ if [ -z "$SHORT_ID" ]; then
     exit 1
 fi
 
+if [ -z "$SERVER_UUID" ]; then
+    echo "ERROR: Failed to extract SERVER_UUID"
+    exit 1
+fi
+
 # Переходим в директорию проекта
 cd ~/vless-reality-project
 
@@ -67,6 +76,7 @@ echo "BOT_TOKEN=${BOT_TOKEN}" > .env
 echo "SERVER_IP=${SERVER_IP}" >> .env
 echo "PUBLIC_KEY=${PUBLIC_KEY}" >> .env
 echo "SHORT_ID=${SHORT_ID}" >> .env
+echo "SERVER_UUID=${SERVER_UUID}" >> .env
 
 echo ""
 echo "=== .env file created successfully ==="
@@ -77,5 +87,6 @@ echo "  BOT_TOKEN: ${BOT_TOKEN:0:10}..."
 echo "  SERVER_IP: $SERVER_IP"
 echo "  PUBLIC_KEY: ${PUBLIC_KEY:0:20}..."
 echo "  SHORT_ID: $SHORT_ID"
+echo "  SERVER_UUID: $SERVER_UUID"
 echo ""
 echo "You can now run: docker compose up -d --build"

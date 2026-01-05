@@ -11,6 +11,7 @@ services:
       - SERVER_IP=${SERVER_IP}
       - PUBLIC_KEY=${PUBLIC_KEY}
       - SHORT_ID=${SHORT_ID}
+      - SERVER_UUID=${SERVER_UUID}
     env_file:
       - .env
     networks:

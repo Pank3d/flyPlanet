@@ -18,6 +18,7 @@ ENV BOT_TOKEN=""
 ENV SERVER_IP=""
 ENV PUBLIC_KEY=""
 ENV SHORT_ID=""
+ENV SERVER_UUID=""
 
 # Запускаем бота
 CMD ["node", "index.js"]

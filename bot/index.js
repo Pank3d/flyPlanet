@@ -1,5 +1,4 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { v4 as uuidv4 } from 'uuid';
 import QRCode from 'qrcode';
 import dotenv from 'dotenv';
 
@@ -8,11 +7,12 @@ dotenv.config();
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const SERVER_IP = process.env.SERVER_IP;
 const PUBLIC_KEY = process.env.PUBLIC_KEY;
-const SHORT_ID = process.env.SHORT_ID || 'be0a50b4';  // Fallback к текущему значению на сервере
+const SHORT_ID = process.env.SHORT_ID || 'be0a50b4';
+const SERVER_UUID = process.env.SERVER_UUID;  // UUID с сервера
 
-if (!BOT_TOKEN || !SERVER_IP || !PUBLIC_KEY) {
+if (!BOT_TOKEN || !SERVER_IP || !PUBLIC_KEY || !SERVER_UUID) {
     console.error('Error: Missing required environment variables');
-    console.error('Required: BOT_TOKEN, SERVER_IP, PUBLIC_KEY, SHORT_ID');
+    console.error('Required: BOT_TOKEN, SERVER_IP, PUBLIC_KEY, SHORT_ID, SERVER_UUID');
     process.exit(1);
 }
 
@@ -20,6 +20,7 @@ console.log('Bot configuration:');
 console.log('- SERVER_IP:', SERVER_IP);
 console.log('- PUBLIC_KEY:', PUBLIC_KEY.substring(0, 20) + '...');
 console.log('- SHORT_ID:', SHORT_ID);
+console.log('- SERVER_UUID:', SERVER_UUID);
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 const users = new Map();
@@ -81,12 +82,9 @@ const handleGetConfig = async (msg) => {
     const statusMsg = await bot.sendMessage(chatId, 'Generating configuration...');
 
     try {
-        let uuid = users.get(userId);
-        if (!uuid) {
-            uuid = uuidv4();
-            users.set(userId, uuid);
-            console.log(`New UUID ${uuid} for ${username}`);
-        }
+        // Используем UUID с сервера для всех пользователей
+        const uuid = SERVER_UUID;
+        console.log(`Using server UUID ${uuid} for ${username}`);
 
         const link = generateVlessLink(uuid, username);
         const qrBuffer = await QRCode.toBuffer(link);
@@ -132,12 +130,8 @@ bot.onText(/\/stats/, (msg) => {
 
 bot.on('callback_query', async (query) => {
     if (query.data === 'new_uuid') {
-        const userId = query.from.id;
-        const newUuid = uuidv4();
-        users.set(userId, newUuid);
-        console.log(`New UUID for ${userId}: ${newUuid}`);
-
-        await bot.answerCallbackQuery(query.id, { text: 'Generating new UUID...' });
+        // Просто регенерируем конфиг с тем же UUID сервера
+        await bot.answerCallbackQuery(query.id, { text: 'Generating config...' });
         await handleGetConfig({ chat: { id: query.message.chat.id }, from: query.from });
     }
 });
