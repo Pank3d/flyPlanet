@@ -18,8 +18,6 @@ if (!BOT_TOKEN || !SERVER_IP || !PUBLIC_KEY) {
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 const users = new Map();
 
-console.log('Bot started');
-console.log(`Server: ${SERVER_IP}:443`);
 
 const generateVlessLink = (uuid, username) => {
     const params = new URLSearchParams({
