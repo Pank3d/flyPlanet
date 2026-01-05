@@ -271,41 +271,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Get credentials from previous job
-        id: extract
-        run: |
-          PUBLIC_KEY="${{ needs.deploy-xray.outputs.public_key }}"
-          SERVER_IP="${{ needs.deploy-xray.outputs.server_ip }}"
-          SHORT_ID="${{ needs.deploy-xray.outputs.short_id }}"
-
-          # Если не получили из artifact, используем secrets
-          if [ -z "$PUBLIC_KEY" ]; then
-            PUBLIC_KEY="${{ secrets.XRAY_PUBLIC_KEY }}"
-            echo "Using PUBLIC_KEY from secrets"
-          fi
-
-          if [ -z "$SERVER_IP" ]; then
-            SERVER_IP="${{ env.VPS_HOST }}"
-          fi
-
-          if [ -z "$SHORT_ID" ]; then
-            SHORT_ID="be0a50b4"
-            echo "Using fallback SHORT_ID: $SHORT_ID"
-          fi
-
-          # Если PUBLIC_KEY все еще пустой, используем placeholder
-          if [ -z "$PUBLIC_KEY" ]; then
-            PUBLIC_KEY="PLACEHOLDER_KEY_CHANGE_ME"
-            echo "Warning: PUBLIC_KEY is empty, using placeholder"
-          fi
-
-          echo "public_key=$PUBLIC_KEY" >> $GITHUB_OUTPUT
-          echo "server_ip=$SERVER_IP" >> $GITHUB_OUTPUT
-          echo "short_id=$SHORT_ID" >> $GITHUB_OUTPUT
-          echo "Server IP: $SERVER_IP"
-          echo "Public Key (first 20 chars): ${PUBLIC_KEY:0:20}..."
-          echo "Short ID: $SHORT_ID"
-
       - name: Prepare deployment directory
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -357,19 +322,26 @@ jobs:
           target: "~/vless-reality-project/"
           strip_components: 0
 
-      - name: Deploy with Docker
-        uses: appleboy/ssh-action@v1.0.0
-        env:
-          BOT_TOKEN: ${{ env.BOT_TOKEN }}
-          SERVER_IP: ${{ steps.extract.outputs.server_ip }}
-          PUBLIC_KEY: ${{ steps.extract.outputs.public_key }}
-          SHORT_ID: ${{ steps.extract.outputs.short_id }}
+      - name: Copy create-env script
+        uses: appleboy/scp-action@v0.1.4
         with:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           password: ${{ env.VPS_PASSWORD }}
           port: ${{ env.VPS_PORT }}
-          envs: BOT_TOKEN,SERVER_IP,PUBLIC_KEY,SHORT_ID
+          source: "create-env.sh"
+          target: "~/vless-reality-project/"
+
+      - name: Deploy with Docker
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          BOT_TOKEN: ${{ env.BOT_TOKEN }}
+        with:
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ env.VPS_PASSWORD }}
+          port: ${{ env.VPS_PORT }}
+          envs: BOT_TOKEN
           script: |
             cd ~/vless-reality-project
 
@@ -388,16 +360,11 @@ jobs:
             echo "=== Bot directory ==="
             ls -la bot/ || echo "No bot directory"
 
-            # Create .env file directly (переменные уже экспортированы через envs)
-            echo "BOT_TOKEN=${BOT_TOKEN}" > .env
-            echo "SERVER_IP=${SERVER_IP}" >> .env
-            echo "PUBLIC_KEY=${PUBLIC_KEY}" >> .env
-            echo "SHORT_ID=${SHORT_ID}" >> .env
-
-            # Debug: show .env content (without sensitive data)
+            # Запускаем create-env.sh скрипт для создания .env
             echo ""
-            echo "=== .env created ==="
-            cat .env | sed 's/=.*/=***/'
+            echo "=== Creating .env from server info ==="
+            chmod +x create-env.sh
+            ./create-env.sh "${BOT_TOKEN}"
 
             # Stop old container
             echo ""
