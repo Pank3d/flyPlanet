@@ -35,34 +35,145 @@ jobs:
 
       - name: Deploy Xray to VPS
         id: deploy_xray
-        continue-on-error: true
-        run: |
-          if [ -d "server" ]; then
-            cd server
-            python deploy.py \
-              --host ${{ env.VPS_HOST }} \
-              --port ${{ env.VPS_PORT }} \
-              --user ${{ env.VPS_USER }} \
-              --password "${{ env.VPS_PASSWORD }}" \
-              --dest ${{ env.REALITY_DEST }} \
-              --sni ${{ env.REALITY_SNI }} \
-              --alias "Reality-Server"
-          else
-            echo "Warning: server directory not found, skipping Xray deployment"
-          fi
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ env.VPS_PASSWORD }}
+          port: ${{ env.VPS_PORT }}
+          script: |
+            set -e
+
+            echo "=== Installing Xray-core ==="
+
+            # Установка Xray если еще не установлен
+            if ! command -v xray &> /dev/null; then
+              bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+            else
+              echo "Xray already installed"
+            fi
+
+            # Генерация ключей REALITY
+            echo "=== Generating REALITY keys ==="
+            KEYS=$(xray x25519)
+            PRIVATE_KEY=$(echo "$KEYS" | grep "Private key:" | awk '{print $3}')
+            PUBLIC_KEY=$(echo "$KEYS" | grep "Public key:" | awk '{print $3}')
+
+            echo "Private Key: $PRIVATE_KEY"
+            echo "Public Key: $PUBLIC_KEY"
+
+            # Генерация UUID
+            UUID=$(xray uuid)
+            echo "UUID: $UUID"
+
+            # Генерация Short ID
+            SHORT_ID=$(openssl rand -hex 4)
+            echo "Short ID: $SHORT_ID"
+
+            # Создание конфига Xray
+            echo "=== Creating Xray config ==="
+            cat > /usr/local/etc/xray/config.json << 'XRAYEOF'
+            {
+              "log": {
+                "loglevel": "warning"
+              },
+              "inbounds": [
+                {
+                  "port": 443,
+                  "protocol": "vless",
+                  "settings": {
+                    "clients": [
+                      {
+                        "id": "UUID_PLACEHOLDER",
+                        "flow": "xtls-rprx-vision"
+                      }
+                    ],
+                    "decryption": "none"
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "realitySettings": {
+                      "show": false,
+                      "dest": "DEST_PLACEHOLDER",
+                      "xver": 0,
+                      "serverNames": [
+                        "SNI_PLACEHOLDER"
+                      ],
+                      "privateKey": "PRIVATE_KEY_PLACEHOLDER",
+                      "shortIds": [
+                        "SHORT_ID_PLACEHOLDER"
+                      ]
+                    }
+                  }
+                }
+              ],
+              "outbounds": [
+                {
+                  "protocol": "freedom",
+                  "tag": "direct"
+                }
+              ]
+            }
+            XRAYEOF
+
+            # Подстановка значений
+            sed -i "s/UUID_PLACEHOLDER/$UUID/g" /usr/local/etc/xray/config.json
+            sed -i "s/PRIVATE_KEY_PLACEHOLDER/$PRIVATE_KEY/g" /usr/local/etc/xray/config.json
+            sed -i "s/SHORT_ID_PLACEHOLDER/$SHORT_ID/g" /usr/local/etc/xray/config.json
+            sed -i "s/DEST_PLACEHOLDER/${{ env.REALITY_DEST }}:443/g" /usr/local/etc/xray/config.json
+            sed -i "s/SNI_PLACEHOLDER/${{ env.REALITY_DEST }}/g" /usr/local/etc/xray/config.json
+
+            # Сохранение информации для бота
+            mkdir -p ~/xray-info
+            cat > ~/xray-info/reality_server_info.json << EOF
+            {
+              "public_key": "$PUBLIC_KEY",
+              "server": "${{ env.VPS_HOST }}",
+              "uuid": "$UUID",
+              "short_id": "$SHORT_ID",
+              "dest": "${{ env.REALITY_DEST }}",
+              "sni": "${{ env.REALITY_DEST }}"
+            }
+            EOF
+
+            echo "Info saved to ~/xray-info/reality_server_info.json"
+
+            # Запуск Xray
+            echo "=== Starting Xray ==="
+            systemctl enable xray
+            systemctl restart xray
+
+            # Проверка статуса
+            sleep 2
+            systemctl status xray --no-pager || true
+
+            echo ""
+            echo "=== Xray Installation Complete ==="
+            echo "Public Key: $PUBLIC_KEY"
+            echo "Server: ${{ env.VPS_HOST }}"
+            echo "Port: 443"
+
+      - name: Download server info from VPS
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ env.VPS_PASSWORD }}
+          port: ${{ env.VPS_PORT }}
+          source: "~/xray-info/reality_server_info.json"
+          target: "./"
+          strip_components: 2
 
       - name: Extract server info
         id: extract
         run: |
-          # Файл создается в папке server/
-          if [ -f server/reality_server_info.json ]; then
-            PUBLIC_KEY=$(jq -r '.public_key' server/reality_server_info.json)
-            SERVER_IP=$(jq -r '.server' server/reality_server_info.json)
+          if [ -f reality_server_info.json ]; then
+            PUBLIC_KEY=$(jq -r '.public_key' reality_server_info.json)
+            SERVER_IP=$(jq -r '.server' reality_server_info.json)
             echo "public_key=$PUBLIC_KEY" >> $GITHUB_OUTPUT
             echo "server_ip=$SERVER_IP" >> $GITHUB_OUTPUT
-
-            # Копируем в корень для артефакта
-            cp server/reality_server_info.json .
+            echo "Extracted PUBLIC_KEY: ${PUBLIC_KEY:0:20}..."
           else
             echo "Warning: reality_server_info.json not found"
             echo "public_key=" >> $GITHUB_OUTPUT
