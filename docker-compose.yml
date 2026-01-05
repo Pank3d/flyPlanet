@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # Telegram бот
+  bot:
+    build: ./bot
+    container_name: vless-reality-bot
+    restart: unless-stopped
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - SERVER_IP=${SERVER_IP}
+      - PUBLIC_KEY=${PUBLIC_KEY}
+    env_file:
+      - .env
+    networks:
+      - vless-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  vless-network:
+    driver: bridge
