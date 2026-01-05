@@ -96,53 +96,45 @@ jobs:
           echo "public_key=$PUBLIC_KEY" >> $GITHUB_OUTPUT
           echo "server_ip=$SERVER_IP" >> $GITHUB_OUTPUT
 
-      - name: Deploy bot to VPS
+      - name: Prepare deployment directory
         uses: appleboy/ssh-action@v1.0.0
-        env:
-          BOT_TOKEN: ${{ env.BOT_TOKEN }}
-          SERVER_IP: ${{ steps.extract.outputs.server_ip }}
-          PUBLIC_KEY: ${{ steps.extract.outputs.public_key }}
         with:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           password: ${{ env.VPS_PASSWORD }}
           port: ${{ env.VPS_PORT }}
-          envs: BOT_TOKEN,SERVER_IP,PUBLIC_KEY
           script: |
             set -e
 
-            # Install Node.js
-            if ! command -v node &> /dev/null; then
-              curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-              apt-get install -y nodejs
+            # Install Docker if not installed
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sh get-docker.sh
+              systemctl enable docker
+              systemctl start docker
             fi
 
-            # Install PM2
-            if ! command -v pm2 &> /dev/null; then
-              npm install -g pm2
+            # Install Docker Compose if not installed
+            if ! command -v docker-compose &> /dev/null; then
+              curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              chmod +x /usr/local/bin/docker-compose
             fi
 
-            # Stop existing bot
-            pm2 stop vless-bot 2>/dev/null || true
-            pm2 delete vless-bot 2>/dev/null || true
+            # Create project directory
+            mkdir -p ~/vless-reality-project
+            cd ~/vless-reality-project
 
-            # Create directory
-            mkdir -p ~/vless-reality-bot
-            cd ~/vless-reality-bot
-            rm -rf *
-
-      - name: Copy bot files
+      - name: Copy project files
         uses: appleboy/scp-action@v0.1.4
         with:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           password: ${{ env.VPS_PASSWORD }}
           port: ${{ env.VPS_PORT }}
-          source: "bot/*"
-          target: "~/vless-reality-bot"
-          strip_components: 1
+          source: "bot/*,docker-compose.yml"
+          target: "~/vless-reality-project"
 
-      - name: Start bot
+      - name: Deploy with Docker
         uses: appleboy/ssh-action@v1.0.0
         env:
           BOT_TOKEN: ${{ env.BOT_TOKEN }}
@@ -155,24 +147,25 @@ jobs:
           port: ${{ env.VPS_PORT }}
           envs: BOT_TOKEN,SERVER_IP,PUBLIC_KEY
           script: |
-            cd ~/vless-reality-bot
+            cd ~/vless-reality-project
 
-            # Install dependencies
-            npm ci --production
-
-            # Create .env
+            # Create .env file
             cat > .env << EOF
             BOT_TOKEN=${BOT_TOKEN}
             SERVER_IP=${SERVER_IP}
             PUBLIC_KEY=${PUBLIC_KEY}
             EOF
 
-            # Start with PM2
-            pm2 start index.js --name vless-bot
-            pm2 save
-            pm2 startup systemd -u root --hp /root
+            # Stop old container
+            docker-compose down 2>/dev/null || true
 
-            echo "Bot started successfully"
+            # Start with Docker Compose
+            docker-compose up -d --build
+
+            # Show status
+            echo "Bot deployment completed!"
+            docker-compose ps
+            docker-compose logs --tail=20 bot
 
   notify:
     name: Send Notification
