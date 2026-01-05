@@ -35,16 +35,21 @@ jobs:
 
       - name: Deploy Xray to VPS
         id: deploy_xray
+        continue-on-error: true
         run: |
-          cd server
-          python deploy.py \
-            --host ${{ env.VPS_HOST }} \
-            --port ${{ env.VPS_PORT }} \
-            --user ${{ env.VPS_USER }} \
-            --password "${{ env.VPS_PASSWORD }}" \
-            --dest ${{ env.REALITY_DEST }} \
-            --sni ${{ env.REALITY_SNI }} \
-            --alias "Reality-Server"
+          if [ -d "server" ]; then
+            cd server
+            python deploy.py \
+              --host ${{ env.VPS_HOST }} \
+              --port ${{ env.VPS_PORT }} \
+              --user ${{ env.VPS_USER }} \
+              --password "${{ env.VPS_PASSWORD }}" \
+              --dest ${{ env.REALITY_DEST }} \
+              --sni ${{ env.REALITY_SNI }} \
+              --alias "Reality-Server"
+          else
+            echo "Warning: server directory not found, skipping Xray deployment"
+          fi
 
       - name: Extract server info
         id: extract
@@ -93,13 +98,23 @@ jobs:
           if [ -f reality_server_info.json ]; then
             PUBLIC_KEY=$(jq -r '.public_key' reality_server_info.json)
             SERVER_IP=$(jq -r '.server' reality_server_info.json)
+            echo "Using PUBLIC_KEY from artifact"
           else
             PUBLIC_KEY="${{ secrets.XRAY_PUBLIC_KEY }}"
             SERVER_IP="${{ env.VPS_HOST }}"
+            echo "Warning: Using PUBLIC_KEY from secrets (artifact not found)"
+          fi
+
+          # Если PUBLIC_KEY пустой, используем placeholder
+          if [ -z "$PUBLIC_KEY" ]; then
+            PUBLIC_KEY="PLACEHOLDER_KEY_CHANGE_ME"
+            echo "Warning: PUBLIC_KEY is empty, using placeholder"
           fi
 
           echo "public_key=$PUBLIC_KEY" >> $GITHUB_OUTPUT
           echo "server_ip=$SERVER_IP" >> $GITHUB_OUTPUT
+          echo "Server IP: $SERVER_IP"
+          echo "Public Key (first 20 chars): ${PUBLIC_KEY:0:20}..."
 
       - name: Prepare deployment directory
         uses: appleboy/ssh-action@v1.0.0
