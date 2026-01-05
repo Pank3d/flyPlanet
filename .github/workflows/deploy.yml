@@ -247,14 +247,6 @@ jobs:
           echo "PUBLIC_KEY: ${PUBLIC_KEY:0:20}..."
           echo "SERVER_IP: $SERVER_IP"
 
-      - name: Upload server info
-        if: hashFiles('reality_server_info.json') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: server-info
-          path: reality_server_info.json
-          retention-days: 30
-
   deploy-bot:
     name: Deploy Telegram Bot
     runs-on: ubuntu-latest
@@ -263,12 +255,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Download server info
-        uses: actions/download-artifact@v4
-        with:
-          name: server-info
-        continue-on-error: true
 
       - name: Get credentials from previous job
         id: extract
