@@ -8,12 +8,18 @@ dotenv.config();
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const SERVER_IP = process.env.SERVER_IP;
 const PUBLIC_KEY = process.env.PUBLIC_KEY;
+const SHORT_ID = process.env.SHORT_ID || 'be0a50b4';  // Fallback к текущему значению на сервере
 
 if (!BOT_TOKEN || !SERVER_IP || !PUBLIC_KEY) {
     console.error('Error: Missing required environment variables');
-    console.error('Required: BOT_TOKEN, SERVER_IP, PUBLIC_KEY');
+    console.error('Required: BOT_TOKEN, SERVER_IP, PUBLIC_KEY, SHORT_ID');
     process.exit(1);
 }
+
+console.log('Bot configuration:');
+console.log('- SERVER_IP:', SERVER_IP);
+console.log('- PUBLIC_KEY:', PUBLIC_KEY.substring(0, 20) + '...');
+console.log('- SHORT_ID:', SHORT_ID);
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 const users = new Map();
@@ -26,7 +32,7 @@ const generateVlessLink = (uuid, username) => {
         fp: 'chrome',
         pbk: PUBLIC_KEY,
         sni: 'yandex.ru',
-        sid: '477b297f',
+        sid: SHORT_ID,
         spx: '/',
         flow: 'xtls-rprx-vision'
     });
@@ -52,7 +58,7 @@ const formatConfig = (uuid, link) => {
             sni: "yandex.ru",
             fp: "chrome",
             pbk: PUBLIC_KEY,
-            sid: "477b297f"
+            sid: SHORT_ID
         }, null, 2) +
         `\n\`\`\``;
 };

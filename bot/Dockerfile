@@ -17,6 +17,7 @@ COPY index.js ./
 ENV BOT_TOKEN=""
 ENV SERVER_IP=""
 ENV PUBLIC_KEY=""
+ENV SHORT_ID=""
 
 # Запускаем бота
 CMD ["node", "index.js"]

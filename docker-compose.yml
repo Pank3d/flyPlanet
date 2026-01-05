@@ -10,6 +10,7 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       - SERVER_IP=${SERVER_IP}
       - PUBLIC_KEY=${PUBLIC_KEY}
+      - SHORT_ID=${SHORT_ID}
     env_file:
       - .env
     networks:

@@ -23,6 +23,7 @@ jobs:
     outputs:
       public_key: ${{ steps.set_outputs.outputs.public_key }}
       server_ip: ${{ steps.set_outputs.outputs.server_ip }}
+      short_id: ${{ steps.set_outputs.outputs.short_id }}
 
     steps:
       - name: Checkout code
@@ -177,7 +178,7 @@ jobs:
             echo "Server: ${{ env.VPS_HOST }}"
             echo "Port: 443"
 
-      - name: Read PUBLIC_KEY from VPS
+      - name: Read server info from VPS
         id: read_key
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -186,33 +187,39 @@ jobs:
           password: ${{ env.VPS_PASSWORD }}
           port: ${{ env.VPS_PORT }}
           script: |
-            echo "=== Reading PUBLIC_KEY from VPS ==="
+            echo "=== Reading server info from VPS ==="
             if [ -f ~/xray-info/reality_server_info.json ]; then
-              echo "File exists, extracting PUBLIC_KEY..."
+              echo "File exists, extracting data..."
               cat ~/xray-info/reality_server_info.json
               echo ""
               echo "Extracted PUBLIC_KEY:"
               cat ~/xray-info/reality_server_info.json | grep -o '"public_key":"[^"]*"' | cut -d'"' -f4
+              echo ""
+              echo "Extracted SHORT_ID:"
+              cat ~/xray-info/reality_server_info.json | grep -o '"short_id":"[^"]*"' | cut -d'"' -f4
             else
               echo "ERROR: File ~/xray-info/reality_server_info.json not found!"
               echo ""
             fi
 
-      - name: Extract and save PUBLIC_KEY
+      - name: Extract and save server info
         id: set_outputs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "=== Extracting PUBLIC_KEY from previous step ==="
+          echo "=== Extracting server info from previous step ==="
           echo "Raw output from read_key step:"
           echo "${{ steps.read_key.outputs.stdout }}"
           echo ""
 
-          # Извлекаем последнюю непустую строку (это должен быть PUBLIC_KEY)
-          PUBLIC_KEY=$(echo "${{ steps.read_key.outputs.stdout }}" | grep -v "^$" | grep -v "===" | grep -v "File exists" | grep -v "Extracted PUBLIC_KEY" | tail -n 1 | tr -d '\r\n\t ')
+          # Извлекаем PUBLIC_KEY
+          PUBLIC_KEY=$(echo "${{ steps.read_key.outputs.stdout }}" | grep -A1 "Extracted PUBLIC_KEY:" | tail -n 1 | tr -d '\r\n\t ')
 
-          echo "Extracted value: '$PUBLIC_KEY'"
-          echo "Length: ${#PUBLIC_KEY}"
+          # Извлекаем SHORT_ID
+          SHORT_ID=$(echo "${{ steps.read_key.outputs.stdout }}" | grep -A1 "Extracted SHORT_ID:" | tail -n 1 | tr -d '\r\n\t ')
+
+          echo "Extracted PUBLIC_KEY: '$PUBLIC_KEY'"
+          echo "Extracted SHORT_ID: '$SHORT_ID'"
 
           # Если не получилось с VPS, пробуем из секретов
           if [ -z "$PUBLIC_KEY" ] || [ "$PUBLIC_KEY" = "" ]; then
@@ -226,9 +233,15 @@ jobs:
 
             # Автоматически сохраняем в GitHub Secrets для следующих запусков
             echo "Saving PUBLIC_KEY to GitHub Secrets..."
-
-            # Используем GitHub CLI для обновления секрета
             echo "$PUBLIC_KEY" | gh secret set XRAY_PUBLIC_KEY --repo ${{ github.repository }} || echo "Failed to save secret (this is ok)"
+          fi
+
+          # Если SHORT_ID не получен, используем fallback
+          if [ -z "$SHORT_ID" ] || [ "$SHORT_ID" = "" ]; then
+            echo "SHORT_ID is empty, using fallback value be0a50b4"
+            SHORT_ID="be0a50b4"
+          else
+            echo "SHORT_ID extracted from VPS: $SHORT_ID"
           fi
 
           SERVER_IP="${{ env.VPS_HOST }}"
@@ -242,10 +255,12 @@ jobs:
 
           echo "public_key=$PUBLIC_KEY" >> $GITHUB_OUTPUT
           echo "server_ip=$SERVER_IP" >> $GITHUB_OUTPUT
+          echo "short_id=$SHORT_ID" >> $GITHUB_OUTPUT
           echo ""
           echo "=== Final values ==="
           echo "PUBLIC_KEY: ${PUBLIC_KEY:0:20}..."
           echo "SERVER_IP: $SERVER_IP"
+          echo "SHORT_ID: $SHORT_ID"
 
   deploy-bot:
     name: Deploy Telegram Bot
@@ -261,6 +276,7 @@ jobs:
         run: |
           PUBLIC_KEY="${{ needs.deploy-xray.outputs.public_key }}"
           SERVER_IP="${{ needs.deploy-xray.outputs.server_ip }}"
+          SHORT_ID="${{ needs.deploy-xray.outputs.short_id }}"
 
           # Если не получили из artifact, используем secrets
           if [ -z "$PUBLIC_KEY" ]; then
@@ -272,6 +288,11 @@ jobs:
             SERVER_IP="${{ env.VPS_HOST }}"
           fi
 
+          if [ -z "$SHORT_ID" ]; then
+            SHORT_ID="be0a50b4"
+            echo "Using fallback SHORT_ID: $SHORT_ID"
+          fi
+
           # Если PUBLIC_KEY все еще пустой, используем placeholder
           if [ -z "$PUBLIC_KEY" ]; then
             PUBLIC_KEY="PLACEHOLDER_KEY_CHANGE_ME"
@@ -280,8 +301,10 @@ jobs:
 
           echo "public_key=$PUBLIC_KEY" >> $GITHUB_OUTPUT
           echo "server_ip=$SERVER_IP" >> $GITHUB_OUTPUT
+          echo "short_id=$SHORT_ID" >> $GITHUB_OUTPUT
           echo "Server IP: $SERVER_IP"
           echo "Public Key (first 20 chars): ${PUBLIC_KEY:0:20}..."
+          echo "Short ID: $SHORT_ID"
 
       - name: Prepare deployment directory
         uses: appleboy/ssh-action@v1.0.0
@@ -340,12 +363,13 @@ jobs:
           BOT_TOKEN: ${{ env.BOT_TOKEN }}
           SERVER_IP: ${{ steps.extract.outputs.server_ip }}
           PUBLIC_KEY: ${{ steps.extract.outputs.public_key }}
+          SHORT_ID: ${{ steps.extract.outputs.short_id }}
         with:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           password: ${{ env.VPS_PASSWORD }}
           port: ${{ env.VPS_PORT }}
-          envs: BOT_TOKEN,SERVER_IP,PUBLIC_KEY
+          envs: BOT_TOKEN,SERVER_IP,PUBLIC_KEY,SHORT_ID
           script: |
             cd ~/vless-reality-project
 
@@ -368,6 +392,7 @@ jobs:
             echo "BOT_TOKEN=${BOT_TOKEN}" > .env
             echo "SERVER_IP=${SERVER_IP}" >> .env
             echo "PUBLIC_KEY=${PUBLIC_KEY}" >> .env
+            echo "SHORT_ID=${SHORT_ID}" >> .env
 
             # Debug: show .env content (without sensitive data)
             echo ""
