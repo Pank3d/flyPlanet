@@ -92,12 +92,18 @@ jobs:
             SHORT_ID=$(openssl rand -hex 4)
             echo "Short ID: $SHORT_ID"
 
+            # Создаем директорию для логов
+            mkdir -p /var/log/xray
+            chmod 755 /var/log/xray
+
             # Создание конфига Xray с прямой подстановкой переменных
             echo "=== Creating Xray config ==="
             cat > /usr/local/etc/xray/config.json << EOF
             {
               "log": {
-                "loglevel": "warning"
+                "loglevel": "debug",
+                "access": "/var/log/xray/access.log",
+                "error": "/var/log/xray/error.log"
               },
               "inbounds": [
                 {
