@@ -177,8 +177,7 @@ jobs:
             sleep 3
 
             # Проверяем статус
-            WARP_STATUS=\$(warp-cli status 2>/dev/null || echo "Disconnected")
-            echo "WARP Status: \$WARP_STATUS"
+            warp-cli status 2>/dev/null || echo "WARP Status: Checking..."
 
             # Обновляем Xray конфиг с WARP routing
             echo ""
@@ -197,7 +196,7 @@ jobs:
                   "settings": {
                     "clients": [
                       {
-                        "id": "\$UUID",
+                        "id": "$UUID",
                         "flow": "xtls-rprx-vision"
                       }
                     ],
@@ -213,9 +212,9 @@ jobs:
                       "serverNames": [
                         "${{ env.REALITY_DEST }}"
                       ],
-                      "privateKey": "\$PRIVATE_KEY",
+                      "privateKey": "$PRIVATE_KEY",
                       "shortIds": [
-                        "\$SHORT_ID"
+                        "$SHORT_ID"
                       ]
                     }
                   }
