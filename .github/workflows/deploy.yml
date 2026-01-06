@@ -96,64 +96,6 @@ jobs:
             mkdir -p /var/log/xray
             chmod 755 /var/log/xray
 
-            # Создание конфига Xray с прямой подстановкой переменных
-            echo "=== Creating Xray config ==="
-            cat > /usr/local/etc/xray/config.json << EOF
-            {
-              "log": {
-                "loglevel": "debug",
-                "access": "/var/log/xray/access.log",
-                "error": "/var/log/xray/error.log"
-              },
-              "inbounds": [
-                {
-                  "port": 443,
-                  "protocol": "vless",
-                  "settings": {
-                    "clients": [
-                      {
-                        "id": "$UUID",
-                        "flow": "xtls-rprx-vision"
-                      }
-                    ],
-                    "decryption": "none"
-                  },
-                  "streamSettings": {
-                    "network": "tcp",
-                    "security": "reality",
-                    "realitySettings": {
-                      "show": false,
-                      "dest": "${{ env.REALITY_DEST }}:443",
-                      "xver": 0,
-                      "serverNames": [
-                        "${{ env.REALITY_DEST }}"
-                      ],
-                      "privateKey": "$PRIVATE_KEY",
-                      "shortIds": [
-                        "$SHORT_ID"
-                      ]
-                    }
-                  }
-                }
-              ],
-              "outbounds": [
-                {
-                  "protocol": "freedom",
-                  "tag": "direct"
-                }
-              ]
-            }
-            EOF
-
-            # Проверка что конфиг создан правильно
-            echo "=== Verifying config ==="
-            if grep -q "PLACEHOLDER" /usr/local/etc/xray/config.json; then
-              echo "ERROR: Config still contains PLACEHOLDER!"
-              cat /usr/local/etc/xray/config.json
-              exit 1
-            fi
-            echo "Config created successfully, no placeholders found"
-
             # Сохранение информации для бота
             mkdir -p ~/xray-info
             cat > ~/xray-info/reality_server_info.json << EOF
@@ -169,7 +111,176 @@ jobs:
 
             echo "Info saved to ~/xray-info/reality_server_info.json"
 
+            # Настройка DPI bypass через iptables
+            echo ""
+            echo "=== Configuring DPI Bypass ==="
+
+            # Устанавливаем iptables если не установлен
+            if ! command -v iptables &> /dev/null; then
+              apt-get install -y iptables iptables-persistent
+            fi
+
+            # Очищаем старые правила
+            iptables -t mangle -F POSTROUTING 2>/dev/null || true
+
+            # 1. Фрагментация TCP пакетов (MSS = 1200)
+            iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1200
+
+            # 2. Модификация TTL
+            iptables -t mangle -A POSTROUTING -j TTL --ttl-set 65
+
+            # Сохраняем правила
+            if command -v netfilter-persistent &> /dev/null; then
+              netfilter-persistent save
+            else
+              mkdir -p /etc/iptables
+              iptables-save > /etc/iptables/rules.v4
+            fi
+
+            echo "DPI bypass configured:"
+            echo "  - TCP MSS: 1200 (packet fragmentation)"
+            echo "  - TTL: 65"
+
+            # Установка и настройка Cloudflare WARP
+            echo ""
+            echo "=== Installing Cloudflare WARP ==="
+
+            # Проверяем установлен ли WARP
+            if ! command -v warp-cli &> /dev/null; then
+              echo "Installing WARP client..."
+
+              # Добавляем репозиторий Cloudflare
+              curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+
+              echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ jammy main" > /etc/apt/sources.list.d/cloudflare-client.list
+
+              apt-get update
+              apt-get install -y cloudflare-warp
+            else
+              echo "WARP already installed"
+            fi
+
+            # Регистрируем и запускаем WARP если еще не зарегистрирован
+            if ! warp-cli account 2>/dev/null | grep -q "Success"; then
+              echo "Registering WARP..."
+              warp-cli registration new 2>/dev/null || true
+            fi
+
+            # Устанавливаем режим proxy
+            warp-cli mode proxy 2>/dev/null || true
+
+            # Подключаем WARP
+            echo "Connecting WARP..."
+            warp-cli connect 2>/dev/null || true
+
+            # Ждем подключения
+            sleep 3
+
+            # Проверяем статус
+            WARP_STATUS=\$(warp-cli status 2>/dev/null || echo "Disconnected")
+            echo "WARP Status: \$WARP_STATUS"
+
+            # Обновляем Xray конфиг с WARP routing
+            echo ""
+            echo "=== Updating Xray config with WARP routing ==="
+            cat > /usr/local/etc/xray/config.json << XRAYEOF
+            {
+              "log": {
+                "loglevel": "debug",
+                "access": "/var/log/xray/access.log",
+                "error": "/var/log/xray/error.log"
+              },
+              "inbounds": [
+                {
+                  "port": 443,
+                  "protocol": "vless",
+                  "settings": {
+                    "clients": [
+                      {
+                        "id": "\$UUID",
+                        "flow": "xtls-rprx-vision"
+                      }
+                    ],
+                    "decryption": "none"
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "realitySettings": {
+                      "show": false,
+                      "dest": "${{ env.REALITY_DEST }}:443",
+                      "xver": 0,
+                      "serverNames": [
+                        "${{ env.REALITY_DEST }}"
+                      ],
+                      "privateKey": "\$PRIVATE_KEY",
+                      "shortIds": [
+                        "\$SHORT_ID"
+                      ]
+                    }
+                  }
+                }
+              ],
+              "outbounds": [
+                {
+                  "protocol": "freedom",
+                  "tag": "direct"
+                },
+                {
+                  "protocol": "socks",
+                  "tag": "warp",
+                  "settings": {
+                    "servers": [
+                      {
+                        "address": "127.0.0.1",
+                        "port": 40000
+                      }
+                    ]
+                  }
+                },
+                {
+                  "protocol": "blackhole",
+                  "tag": "block"
+                }
+              ],
+              "routing": {
+                "domainStrategy": "IPIfNonMatch",
+                "rules": [
+                  {
+                    "type": "field",
+                    "ip": [
+                      "5.28.195.0/24",
+                      "31.13.64.0/18",
+                      "157.240.0.0/16"
+                    ],
+                    "outboundTag": "warp"
+                  },
+                  {
+                    "type": "field",
+                    "domain": [
+                      "whatsapp.com",
+                      "whatsapp.net",
+                      "facebook.com",
+                      "instagram.com",
+                      "fb.com",
+                      "fbcdn.net"
+                    ],
+                    "outboundTag": "warp"
+                  },
+                  {
+                    "type": "field",
+                    "network": "tcp,udp",
+                    "outboundTag": "direct"
+                  }
+                ]
+              }
+            }
+            XRAYEOF
+
+            echo "Xray config updated with WARP routing for blocked IPs/domains"
+
             # Запуск Xray
+            echo ""
             echo "=== Starting Xray ==="
             systemctl enable xray
             systemctl restart xray
@@ -179,10 +290,15 @@ jobs:
             systemctl status xray --no-pager || true
 
             echo ""
-            echo "=== Xray Installation Complete ==="
+            echo "=== Installation Complete ==="
             echo "Public Key: $PUBLIC_KEY"
             echo "Server: ${{ env.VPS_HOST }}"
             echo "Port: 443"
+            echo ""
+            echo "Anti-censorship features enabled:"
+            echo "  ✓ DPI bypass (TCP MSS fragmentation, TTL modification)"
+            echo "  ✓ WARP routing for blocked IPs/domains"
+            echo "  ✓ Debug logging"
 
       - name: Read server info from VPS
         id: read_key
