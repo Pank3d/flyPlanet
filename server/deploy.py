@@ -121,7 +121,7 @@ class RealityDeployer:
 
         return True
 
-    def create_config(self, user_id, private_key, dest_domain="yandex.ru", server_names=None):
+    def create_config(self, user_id, private_key, 2dest_domain="yandex.ru", server_names=None):
         """Создание конфигурации сервера"""
         print("\n[STEP 3] Создание конфигурации...")
 
