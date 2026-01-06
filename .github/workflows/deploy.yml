@@ -57,30 +57,6 @@ jobs:
               echo "Xray already installed"
             fi
 
-            # Скачивание geo-данных для routing и DNS
-            echo "=== Downloading geo data files ==="
-            mkdir -p /usr/local/share/xray
-
-            # Скачиваем geoip.dat
-            if [ ! -f /usr/local/share/xray/geoip.dat ]; then
-              echo "Downloading geoip.dat..."
-              curl -L -o /usr/local/share/xray/geoip.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
-            else
-              echo "geoip.dat already exists, updating..."
-              curl -L -o /usr/local/share/xray/geoip.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
-            fi
-
-            # Скачиваем geosite.dat
-            if [ ! -f /usr/local/share/xray/geosite.dat ]; then
-              echo "Downloading geosite.dat..."
-              curl -L -o /usr/local/share/xray/geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
-            else
-              echo "geosite.dat already exists, updating..."
-              curl -L -o /usr/local/share/xray/geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
-            fi
-
-            echo "Geo data files downloaded successfully"
-
             # Генерация ключей REALITY
             echo "=== Generating REALITY keys ==="
             KEYS=$(xray x25519)
@@ -129,30 +105,6 @@ jobs:
                 "access": "/var/log/xray/access.log",
                 "error": "/var/log/xray/error.log"
               },
-              "dns": {
-                "servers": [
-                  "https+local://1.1.1.1/dns-query",
-                  "https+local://8.8.8.8/dns-query",
-                  "https+local://9.9.9.9/dns-query",
-                  {
-                    "address": "fakedns",
-                    "domains": [
-                      "geosite:cn",
-                      "geosite:geolocation-!cn"
-                    ]
-                  },
-                  "localhost"
-                ],
-                "queryStrategy": "UseIPv4",
-                "disableCache": false,
-                "disableFallback": true
-              },
-              "fakedns": [
-                {
-                  "ipPool": "198.18.0.0/15",
-                  "poolSize": 65535
-                }
-              ],
               "inbounds": [
                 {
                   "port": 443,
@@ -181,74 +133,15 @@ jobs:
                         "$SHORT_ID"
                       ]
                     }
-                  },
-                  "sniffing": {
-                    "enabled": true,
-                    "destOverride": [
-                      "fakedns",
-                      "http",
-                      "tls",
-                      "quic"
-                    ],
-                    "metadataOnly": false,
-                    "routeOnly": true
                   }
                 }
               ],
               "outbounds": [
                 {
                   "protocol": "freedom",
-                  "tag": "direct",
-                  "settings": {
-                    "domainStrategy": "UseIPv4"
-                  }
-                },
-                {
-                  "protocol": "freedom",
-                  "tag": "freedom-ipv6",
-                  "settings": {
-                    "domainStrategy": "UseIPv6"
-                  }
-                },
-                {
-                  "protocol": "blackhole",
-                  "tag": "block"
+                  "tag": "direct"
                 }
-              ],
-              "routing": {
-                "domainStrategy": "AsIs",
-                "rules": [
-                  {
-                    "type": "field",
-                    "inboundTag": ["api"],
-                    "outboundTag": "api"
-                  },
-                  {
-                    "type": "field",
-                    "ip": [
-                      "geoip:private"
-                    ],
-                    "outboundTag": "block"
-                  },
-                  {
-                    "type": "field",
-                    "protocol": ["bittorrent"],
-                    "outboundTag": "block"
-                  },
-                  {
-                    "type": "field",
-                    "domain": [
-                      "geosite:category-ads-all"
-                    ],
-                    "outboundTag": "block"
-                  },
-                  {
-                    "type": "field",
-                    "network": "tcp,udp",
-                    "outboundTag": "direct"
-                  }
-                ]
-              }
+              ]
             }
             EOF
 
