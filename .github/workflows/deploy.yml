@@ -160,13 +160,21 @@ jobs:
               echo "WARP already installed"
             fi
 
-            # Регистрируем и запускаем WARP если еще не зарегистрирован
-            if ! warp-cli account 2>/dev/null | grep -q "Success"; then
-              echo "Registering WARP..."
-              warp-cli registration new 2>/dev/null || true
-            fi
+            # Запускаем WARP daemon
+            echo "Starting WARP daemon..."
+            systemctl enable warp-svc
+            systemctl restart warp-svc
+
+            # Ждем запуска daemon
+            sleep 5
+
+            # Регистрируем и запускаем WARP
+            echo "Registering WARP..."
+            warp-cli registration delete 2>/dev/null || true
+            warp-cli registration new 2>/dev/null || true
 
             # Устанавливаем режим proxy
+            echo "Setting WARP to proxy mode..."
             warp-cli mode proxy 2>/dev/null || true
 
             # Подключаем WARP
@@ -174,10 +182,16 @@ jobs:
             warp-cli connect 2>/dev/null || true
 
             # Ждем подключения
-            sleep 3
+            sleep 5
 
             # Проверяем статус
-            warp-cli status 2>/dev/null || echo "WARP Status: Checking..."
+            echo "WARP Status:"
+            warp-cli status 2>/dev/null || echo "WARP not connected (will use direct routing)"
+
+            # Проверяем порт
+            echo ""
+            echo "Checking WARP SOCKS5 proxy port:"
+            ss -tulpn | grep 40000 || echo "Port 40000 not listening (WARP proxy not active)"
 
             # Обновляем Xray конфиг с WARP routing
             echo ""
@@ -245,27 +259,6 @@ jobs:
               "routing": {
                 "domainStrategy": "IPIfNonMatch",
                 "rules": [
-                  {
-                    "type": "field",
-                    "ip": [
-                      "5.28.195.0/24",
-                      "31.13.64.0/18",
-                      "157.240.0.0/16"
-                    ],
-                    "outboundTag": "warp"
-                  },
-                  {
-                    "type": "field",
-                    "domain": [
-                      "whatsapp.com",
-                      "whatsapp.net",
-                      "facebook.com",
-                      "instagram.com",
-                      "fb.com",
-                      "fbcdn.net"
-                    ],
-                    "outboundTag": "warp"
-                  },
                   {
                     "type": "field",
                     "network": "tcp,udp",
