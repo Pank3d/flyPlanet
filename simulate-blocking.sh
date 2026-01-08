@@ -70,8 +70,8 @@ case "$1" in
     echo ""
     sudo iptables -L OUTPUT -n -v
     echo ""
-    TOTAL_RULES=\$(sudo iptables -L OUTPUT -n | grep -c "^")
-    echo "Total rules: \$TOTAL_RULES"
+    TOTAL_RULES=$(sudo iptables -L OUTPUT -n | grep -c "^")
+    echo "Total rules: $TOTAL_RULES"
     ;;
 
   test)
@@ -108,7 +108,7 @@ case "$1" in
     ;;
 
   *)
-    echo "Usage: \$0 {enable|disable|status|test}"
+    echo "Usage: $0 {enable|disable|status|test}"
     echo ""
     echo "Commands:"
     echo "  enable  - Block ALL traffic except Yandex (total censorship simulation)"

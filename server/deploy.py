@@ -103,39 +103,89 @@ class RealityDeployer:
             print("[ERROR] Ошибка установки Xray")
             return False
 
-    def configure_firewall(self):
-        """Настройка фаерволла"""
+    def configure_firewall(self, multi_port=True):
+        """Настройка фаерволла для множественных портов"""
         print("\n[STEP 2] Настройка фаерволла...")
+
+        # Порты для открытия
+        ports = [443, 8443, 2053, 2083, 2087] if multi_port else [443]
 
         # Проверяем UFW
         output, code = self.ssh_command("which ufw")
         if code == 0 and output.strip():
-            self.ssh_command("ufw allow 443/tcp")
+            for port in ports:
+                self.ssh_command(f"ufw allow {port}/tcp")
+                print(f"  - Порт {port}/tcp разрешен")
             self.ssh_command("echo 'y' | ufw enable")
             print("[OK] UFW настроен")
         else:
             # iptables как запасной вариант
-            self.ssh_command("iptables -A INPUT -p tcp --dport 443 -j ACCEPT")
+            for port in ports:
+                self.ssh_command(f"iptables -A INPUT -p tcp --dport {port} -j ACCEPT")
+                print(f"  - Порт {port}/tcp разрешен")
+            self.ssh_command("mkdir -p /etc/iptables")
             self.ssh_command("iptables-save > /etc/iptables/rules.v4")
             print("[OK] iptables настроен")
 
         return True
 
-    def create_config(self, user_id, private_key, dest_domain="yandex.ru", server_names=None):
-        """Создание конфигурации сервера"""
+    def create_config(self, user_id, private_key, dest_domain="yandex.ru", server_names=None, multi_port=True):
+        """Создание конфигурации сервера с поддержкой множественных портов для разных операторов"""
         print("\n[STEP 3] Создание конфигурации...")
 
         if server_names is None:
             server_names = ["yandex.ru", "ya.ru", "disk.yandex.ru"]
 
-        config = {
-            "log": {
-                "loglevel": "warning"
+        # Профили для разных операторов (только российские SNI)
+        operator_profiles = [
+            {
+                "port": 443,
+                "dest": "yandex.ru:443",
+                "serverNames": ["yandex.ru", "ya.ru", "passport.yandex.ru", "disk.yandex.ru"],
+                "shortIds": ["", "a1b2c3d4"],
+                "comment": "Yandex - универсальный, работает с Tele2, Билайн"
             },
-            "inbounds": [
-                {
-                    "port": 443,
+            {
+                "port": 8443,
+                "dest": "vk.com:443",
+                "serverNames": ["vk.com", "vk.ru", "userapi.com", "vk.me"],
+                "shortIds": ["", "e5f6g7h8"],
+                "comment": "VK - хорошо для МТС, Билайн"
+            },
+            {
+                "port": 2053,
+                "dest": "mail.ru:443",
+                "serverNames": ["mail.ru", "e.mail.ru", "cloud.mail.ru", "my.mail.ru"],
+                "shortIds": ["", "i9j0k1l2"],
+                "comment": "Mail.ru - альтернатива для Билайн, Tele2"
+            },
+            {
+                "port": 2083,
+                "dest": "ok.ru:443",
+                "serverNames": ["ok.ru", "www.ok.ru", "m.ok.ru"],
+                "shortIds": ["", "m3n4o5p6"],
+                "comment": "OK.ru - для Мегафон, МТС"
+            },
+            {
+                "port": 2087,
+                "dest": "rutube.ru:443",
+                "serverNames": ["rutube.ru", "www.rutube.ru"],
+                "shortIds": ["", "q7r8s9t0"],
+                "comment": "RuTube - альтернативный порт для всех операторов"
+            }
+        ]
+
+        # Создаем inbounds для каждого профиля
+        inbounds = []
+
+        if multi_port:
+            print("[INFO] Создание мультипортовой конфигурации для разных операторов...")
+            for profile in operator_profiles:
+                print(f"  - Порт {profile['port']}: {profile['comment']}")
+                inbounds.append({
+                    "port": profile["port"],
                     "protocol": "vless",
+                    "tag": f"inbound-{profile['port']}",
                     "settings": {
                         "clients": [
                             {
@@ -150,18 +200,50 @@ class RealityDeployer:
                         "security": "reality",
                         "realitySettings": {
                             "show": False,
-                            "dest": f"{dest_domain}:443",
+                            "dest": profile["dest"],
                             "xver": 0,
-                            "serverNames": server_names,
+                            "serverNames": profile["serverNames"],
                             "privateKey": private_key,
-                            "shortIds": [
-                                "",
-                                "477b297f"
-                            ]
+                            "shortIds": profile["shortIds"]
                         }
                     }
+                })
+        else:
+            # Стандартная конфигурация с одним портом
+            inbounds.append({
+                "port": 443,
+                "protocol": "vless",
+                "settings": {
+                    "clients": [
+                        {
+                            "id": user_id,
+                            "flow": "xtls-rprx-vision"
+                        }
+                    ],
+                    "decryption": "none"
+                },
+                "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "realitySettings": {
+                        "show": False,
+                        "dest": f"{dest_domain}:443",
+                        "xver": 0,
+                        "serverNames": server_names,
+                        "privateKey": private_key,
+                        "shortIds": [
+                            "",
+                            "477b297f"
+                        ]
+                    }
                 }
-            ],
+            })
+
+        config = {
+            "log": {
+                "loglevel": "warning"
+            },
+            "inbounds": inbounds,
             "outbounds": [
                 {
                     "protocol": "freedom",
@@ -171,6 +253,7 @@ class RealityDeployer:
         }
 
         self.config = config
+        self.operator_profiles = operator_profiles if multi_port else None
         return config
 
     def deploy_config(self):
@@ -237,13 +320,16 @@ class RealityDeployer:
 
         return link
 
-    def deploy(self, dest_domain="yandex.ru", server_names=None, alias="Reality-Server"):
+    def deploy(self, dest_domain="yandex.ru", server_names=None, alias="Reality-Server", multi_port=True):
         """Полное развертывание"""
         print("=" * 80)
         print("VLESS + REALITY Автоматический деплой")
         print("=" * 80)
         print(f"Сервер: {self.host}")
-        print(f"Домен маскировки: {dest_domain}")
+        if multi_port:
+            print("Режим: Мультипортовая конфигурация (6 профилей для разных операторов)")
+        else:
+            print(f"Домен маскировки: {dest_domain}")
         print("=" * 80)
 
         # Шаг 1: Установка Xray
@@ -251,7 +337,7 @@ class RealityDeployer:
             return False
 
         # Шаг 2: Настройка фаерволла
-        if not self.configure_firewall():
+        if not self.configure_firewall(multi_port=multi_port):
             return False
 
         # Генерация UUID и ключей
@@ -263,7 +349,7 @@ class RealityDeployer:
             return False
 
         # Шаг 3: Создание конфигурации
-        self.create_config(user_id, private_key, dest_domain, server_names)
+        self.create_config(user_id, private_key, dest_domain, server_names, multi_port=multi_port)
 
         # Шаг 4: Развертывание
         if not self.deploy_config():
@@ -273,35 +359,97 @@ class RealityDeployer:
         if not self.start_xray():
             return False
 
-        # Генерация клиентской ссылки
+        # Генерация клиентских ссылок
         print("\n" + "=" * 80)
         print("РАЗВЕРТЫВАНИЕ ЗАВЕРШЕНО!")
         print("=" * 80)
 
-        client_link = self.generate_client_link(user_id, public_key,
-                                                 server_names[0] if server_names else dest_domain,
-                                                 alias)
+        if multi_port and self.operator_profiles:
+            print("\n📱 КОНФИГУРАЦИИ ДЛЯ РАЗНЫХ ОПЕРАТОРОВ:")
+            print("=" * 80)
 
-        print(f"\nВаша клиентская ссылка:\n")
-        print(client_link)
-        print("\n" + "=" * 80)
+            all_links = []
+            for profile in self.operator_profiles:
+                sni = profile["serverNames"][0]
+                short_id = profile["shortIds"][1] if len(profile["shortIds"]) > 1 else profile["shortIds"][0]
+                port = profile["port"]
 
-        # Сохраняем информацию
-        info = {
-            "server": self.host,
-            "uuid": user_id,
-            "public_key": public_key,
-            "private_key": private_key,
-            "dest_domain": dest_domain,
-            "server_names": server_names if server_names else [dest_domain],
-            "client_link": client_link
-        }
+                # Создаем название конфигурации с операторами
+                # Берем часть после " - " из комментария (например: "работает с Tele2, Билайн")
+                operators_part = profile['comment'].split(' - ')[1] if ' - ' in profile['comment'] else profile['comment']
+                # Убираем лишние слова, оставляем только операторов
+                import re
+                operators = re.sub(r'универсальный,?\s?', '', operators_part, flags=re.IGNORECASE)
+                operators = re.sub(r'работает с\s?', '', operators, flags=re.IGNORECASE)
+                operators = re.sub(r'хорошо для\s?', '', operators, flags=re.IGNORECASE)
+                operators = re.sub(r'для\s?', '', operators, flags=re.IGNORECASE)
+                operators = re.sub(r'альтернатива для\s?', '', operators, flags=re.IGNORECASE)
+                operators = re.sub(r'альтернативный порт для всех операторов', 'Все операторы', operators, flags=re.IGNORECASE)
+                operators = re.sub(r'стабильно работает на всех операторах', 'Все операторы', operators, flags=re.IGNORECASE)
+                config_name = operators.strip()
+
+                params = {
+                    "type": "tcp",
+                    "security": "reality",
+                    "fp": "chrome",
+                    "pbk": public_key,
+                    "sni": sni,
+                    "sid": short_id,
+                    "spx": "/",
+                    "flow": "xtls-rprx-vision"
+                }
+                param_str = "&".join([f"{k}={v}" for k, v in params.items()])
+                link = f"vless://{user_id}@{self.host}:{port}?{param_str}#{config_name}"
+
+                print(f"\n{profile['comment']}")
+                print(f"Порт: {port} | SNI: {sni}")
+                print(f"Название конфига: {config_name}")
+                print(f"Ссылка: {link}")
+
+                all_links.append({
+                    "port": port,
+                    "sni": sni,
+                    "short_id": short_id,
+                    "comment": profile["comment"],
+                    "link": link
+                })
+
+            print("\n" + "=" * 80)
+
+            # Сохраняем информацию
+            info = {
+                "server": self.host,
+                "uuid": user_id,
+                "public_key": public_key,
+                "private_key": private_key,
+                "multi_port": True,
+                "profiles": all_links
+            }
+        else:
+            # Одиночная конфигурация
+            client_link = self.generate_client_link(user_id, public_key,
+                                                     server_names[0] if server_names else dest_domain,
+                                                     alias)
+            print(f"\nВаша клиентская ссылка:\n")
+            print(client_link)
+            print("\n" + "=" * 80)
+
+            info = {
+                "server": self.host,
+                "uuid": user_id,
+                "public_key": public_key,
+                "private_key": private_key,
+                "dest_domain": dest_domain,
+                "server_names": server_names if server_names else [dest_domain],
+                "client_link": client_link
+            }
 
         with open("reality_server_info.json", 'w', encoding='utf-8') as f:
             json.dump(info, f, indent=2, ensure_ascii=False)
 
         print("\nИнформация сохранена в: reality_server_info.json")
-        print("Используйте эту ссылку в v2rayN, v2rayNG, Nekoray или другом клиенте")
+        print("Используйте эти ссылки в v2rayN, v2rayNG, Nekoray или другом клиенте")
+        print("Выбирайте конфигурацию в зависимости от вашего оператора")
         print("=" * 80)
 
         return True

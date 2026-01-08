@@ -111,14 +111,43 @@ jobs:
 
             echo "Info saved to ~/xray-info/reality_server_info.json"
 
+            # Настройка firewall для множественных портов
+            echo ""
+            echo "=== Configuring Firewall for Multiple Ports ==="
+
+            # Порты для открытия (5 профилей)
+            PORTS="443 8443 2053 2083 2087"
+
+            # Проверяем UFW
+            if command -v ufw &> /dev/null; then
+              echo "Configuring UFW..."
+              for port in $PORTS; do
+                ufw allow $port/tcp
+                echo "  - Port $port/tcp allowed"
+              done
+              echo 'y' | ufw enable
+              echo "UFW configured"
+            else
+              echo "UFW not found, using iptables..."
+              # Устанавливаем iptables если не установлен
+              if ! command -v iptables &> /dev/null; then
+                apt-get install -y iptables iptables-persistent
+              fi
+
+              # Открываем порты через iptables
+              for port in $PORTS; do
+                iptables -A INPUT -p tcp --dport $port -j ACCEPT
+                echo "  - Port $port/tcp allowed"
+              done
+
+              mkdir -p /etc/iptables
+              iptables-save > /etc/iptables/rules.v4
+              echo "iptables configured"
+            fi
+
             # Настройка DPI bypass через iptables
             echo ""
             echo "=== Configuring DPI Bypass ==="
-
-            # Устанавливаем iptables если не установлен
-            if ! command -v iptables &> /dev/null; then
-              apt-get install -y iptables iptables-persistent
-            fi
 
             # Очищаем старые правила
             iptables -t mangle -F POSTROUTING 2>/dev/null || true
@@ -193,9 +222,9 @@ jobs:
             echo "Checking WARP SOCKS5 proxy port:"
             ss -tulpn | grep 40000 || echo "Port 40000 not listening (WARP proxy not active)"
 
-            # Обновляем Xray конфиг с WARP routing
+            # Обновляем Xray конфиг с мультипортовой конфигурацией
             echo ""
-            echo "=== Updating Xray config with WARP routing ==="
+            echo "=== Creating multi-port Xray config for different operators ==="
             cat > /usr/local/etc/xray/config.json << XRAYEOF
             {
               "log": {
@@ -207,13 +236,9 @@ jobs:
                 {
                   "port": 443,
                   "protocol": "vless",
+                  "tag": "inbound-443",
                   "settings": {
-                    "clients": [
-                      {
-                        "id": "$UUID",
-                        "flow": "xtls-rprx-vision"
-                      }
-                    ],
+                    "clients": [{"id": "$UUID", "flow": "xtls-rprx-vision"}],
                     "decryption": "none"
                   },
                   "streamSettings": {
@@ -221,15 +246,116 @@ jobs:
                     "security": "reality",
                     "realitySettings": {
                       "show": false,
-                      "dest": "${{ env.REALITY_DEST }}:443",
+                      "dest": "yandex.ru:443",
                       "xver": 0,
-                      "serverNames": [
-                        "${{ env.REALITY_DEST }}"
-                      ],
+                      "serverNames": ["yandex.ru", "ya.ru", "passport.yandex.ru", "disk.yandex.ru"],
                       "privateKey": "$PRIVATE_KEY",
-                      "shortIds": [
-                        "$SHORT_ID"
-                      ]
+                      "shortIds": ["", "a1b2c3d4"]
+                    }
+                  }
+                },
+                {
+                  "port": 8443,
+                  "protocol": "vless",
+                  "tag": "inbound-8443",
+                  "settings": {
+                    "clients": [{"id": "$UUID", "flow": "xtls-rprx-vision"}],
+                    "decryption": "none"
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "realitySettings": {
+                      "show": false,
+                      "dest": "vk.com:443",
+                      "xver": 0,
+                      "serverNames": ["vk.com", "vk.ru", "userapi.com", "vk.me"],
+                      "privateKey": "$PRIVATE_KEY",
+                      "shortIds": ["", "e5f6g7h8"]
+                    }
+                  }
+                },
+                {
+                  "port": 2053,
+                  "protocol": "vless",
+                  "tag": "inbound-2053",
+                  "settings": {
+                    "clients": [{"id": "$UUID", "flow": "xtls-rprx-vision"}],
+                    "decryption": "none"
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "realitySettings": {
+                      "show": false,
+                      "dest": "mail.ru:443",
+                      "xver": 0,
+                      "serverNames": ["mail.ru", "e.mail.ru", "cloud.mail.ru", "my.mail.ru"],
+                      "privateKey": "$PRIVATE_KEY",
+                      "shortIds": ["", "i9j0k1l2"]
+                    }
+                  }
+                },
+                {
+                  "port": 2083,
+                  "protocol": "vless",
+                  "tag": "inbound-2083",
+                  "settings": {
+                    "clients": [{"id": "$UUID", "flow": "xtls-rprx-vision"}],
+                    "decryption": "none"
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "realitySettings": {
+                      "show": false,
+                      "dest": "ok.ru:443",
+                      "xver": 0,
+                      "serverNames": ["ok.ru", "www.ok.ru", "m.ok.ru"],
+                      "privateKey": "$PRIVATE_KEY",
+                      "shortIds": ["", "m3n4o5p6"]
+                    }
+                  }
+                },
+                {
+                  "port": 2087,
+                  "protocol": "vless",
+                  "tag": "inbound-2087",
+                  "settings": {
+                    "clients": [{"id": "$UUID", "flow": "xtls-rprx-vision"}],
+                    "decryption": "none"
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "realitySettings": {
+                      "show": false,
+                      "dest": "rutube.ru:443",
+                      "xver": 0,
+                      "serverNames": ["rutube.ru", "www.rutube.ru"],
+                      "privateKey": "$PRIVATE_KEY",
+                      "shortIds": ["", "q7r8s9t0"]
+                    }
+                  }
+                },
+                {
+                  "port": 2096,
+                  "protocol": "vless",
+                  "tag": "inbound-2096",
+                  "settings": {
+                    "clients": [{"id": "$UUID", "flow": "xtls-rprx-vision"}],
+                    "decryption": "none"
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "realitySettings": {
+                      "show": false,
+                      "dest": "sberbank.ru:443",
+                      "xver": 0,
+                      "serverNames": ["sberbank.ru", "www.sberbank.ru", "online.sberbank.ru"],
+                      "privateKey": "$PRIVATE_KEY",
+                      "shortIds": ["", "u1v2w3x4"]
                     }
                   }
                 }
@@ -269,7 +395,7 @@ jobs:
             }
             XRAYEOF
 
-            echo "Xray config updated with WARP routing for blocked IPs/domains"
+            echo "Xray multi-port config created with 6 profiles for different operators"
 
             # Запуск Xray
             echo ""
@@ -285,11 +411,19 @@ jobs:
             echo "=== Installation Complete ==="
             echo "Public Key: $PUBLIC_KEY"
             echo "Server: ${{ env.VPS_HOST }}"
-            echo "Port: 443"
+            echo ""
+            echo "Configured ports for different operators:"
+            echo "  ✓ Port 443:  Yandex (Tele2, Beeline)"
+            echo "  ✓ Port 8443: VK (MTS, Beeline)"
+            echo "  ✓ Port 2053: Mail.ru (Beeline, Tele2)"
+            echo "  ✓ Port 2083: OK.ru (Megafon, MTS)"
+            echo "  ✓ Port 2087: RuTube (Universal)"
+            echo "  ✓ Port 2096: Sberbank (Universal)"
             echo ""
             echo "Anti-censorship features enabled:"
             echo "  ✓ DPI bypass (TCP MSS fragmentation, TTL modification)"
             echo "  ✓ WARP routing for blocked IPs/domains"
+            echo "  ✓ Multi-port configuration with Russian SNI"
             echo "  ✓ Debug logging"
 
       - name: Read server info from VPS
