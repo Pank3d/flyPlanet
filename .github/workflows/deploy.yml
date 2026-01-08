@@ -337,27 +337,6 @@ jobs:
                       "shortIds": ["", "q7r8s9t0"]
                     }
                   }
-                },
-                {
-                  "port": 2096,
-                  "protocol": "vless",
-                  "tag": "inbound-2096",
-                  "settings": {
-                    "clients": [{"id": "$UUID", "flow": "xtls-rprx-vision"}],
-                    "decryption": "none"
-                  },
-                  "streamSettings": {
-                    "network": "tcp",
-                    "security": "reality",
-                    "realitySettings": {
-                      "show": false,
-                      "dest": "sberbank.ru:443",
-                      "xver": 0,
-                      "serverNames": ["sberbank.ru", "www.sberbank.ru", "online.sberbank.ru"],
-                      "privateKey": "$PRIVATE_KEY",
-                      "shortIds": ["", "u1v2w3x4"]
-                    }
-                  }
                 }
               ],
               "outbounds": [
@@ -395,7 +374,7 @@ jobs:
             }
             XRAYEOF
 
-            echo "Xray multi-port config created with 6 profiles for different operators"
+            echo "Xray multi-port config created with 5 profiles for different operators"
 
             # Запуск Xray
             echo ""
@@ -418,7 +397,6 @@ jobs:
             echo "  ✓ Port 2053: Mail.ru (Beeline, Tele2)"
             echo "  ✓ Port 2083: OK.ru (Megafon, MTS)"
             echo "  ✓ Port 2087: RuTube (Universal)"
-            echo "  ✓ Port 2096: Sberbank (Universal)"
             echo ""
             echo "Anti-censorship features enabled:"
             echo "  ✓ DPI bypass (TCP MSS fragmentation, TTL modification)"
