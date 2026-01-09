@@ -1,1 +1,0 @@
-{"version":3,"file":"deleteMessage.js","sourceRoot":"","sources":["../../../src/helpers/bot/deleteMessage.ts"],"names":[],"mappings":"AAEA,MAAM,CAAC,MAAM,gBAAgB,GAAG,KAAK,EACnC,GAAgB,EAChB,MAAuB,EACvB,SAAiB,EACjB,EAAE;IACF,OAAO,MAAM,GAAG,CAAC,aAAa,CAAC,MAAM,EAAE,SAAS,CAAC,CAAC;AACpD,CAAC,CAAC"}

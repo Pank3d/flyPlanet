@@ -4,14 +4,21 @@ FROM node:18-alpine
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем package.json
-COPY package.json ./
+# Копируем package.json и package-lock.json
+COPY package*.json ./
 
-# Устанавливаем зависимости
-RUN npm install --production --no-package-lock
+# Устанавливаем ВСЕ зависимости (включая devDependencies для сборки)
+RUN npm install
 
-# Копируем код бота
-COPY index.js ./
+# Копируем исходный код и конфигурацию TypeScript
+COPY src ./src
+COPY tsconfig.json ./
+
+# Собираем TypeScript проект
+RUN npm run build
+
+# Удаляем devDependencies для уменьшения размера образа
+RUN npm prune --production
 
 # Указываем переменные окружения (будут переопределены через docker-compose)
 ENV BOT_TOKEN=""
@@ -20,5 +27,5 @@ ENV PUBLIC_KEY=""
 ENV SHORT_ID=""
 ENV SERVER_UUID=""
 
-# Запускаем бота
-CMD ["node", "index.js"]
+# Запускаем скомпилированный код
+CMD ["node", "dist/index.js"]

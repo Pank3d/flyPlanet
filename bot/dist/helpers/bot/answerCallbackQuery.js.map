@@ -1,1 +1,0 @@
-{"version":3,"file":"answerCallbackQuery.js","sourceRoot":"","sources":["../../../src/helpers/bot/answerCallbackQuery.ts"],"names":[],"mappings":"AAEA,MAAM,CAAC,MAAM,sBAAsB,GAAG,KAAK,EACzC,GAAgB,EAChB,eAAuB,EACvB,OAAoF,EACpF,EAAE;IACF,OAAO,MAAM,GAAG,CAAC,mBAAmB,CAAC,eAAe,EAAE,OAAO,CAAC,CAAC;AACjE,CAAC,CAAC"}

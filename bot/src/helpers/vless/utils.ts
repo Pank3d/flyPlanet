@@ -8,7 +8,6 @@ dotenv.config();
 const PUBLIC_KEY = process.env.PUBLIC_KEY as string;
 const SERVER_IP = process.env.SERVER_IP as string;
 
-
 export const generateVlessLink = (
   uuid: string,
   profile: ProfilesType
