@@ -109,18 +109,12 @@ const formatConfigForOperator = (uuid, profileData) => {
         `\`${profileData.link}\``;
 };
 
-const formatAllConfigs = (uuid, profiles) => {
-    let message = `*📱 VLESS + REALITY Конфигурации*\n\n`;
-    message += `*Server:* ${SERVER_IP}\n`;
-    message += `*UUID:* \`${uuid}\`\n`;
-    message += `*Flow:* xtls-rprx-vision\n\n`;
-    message += `*Выберите конфигурацию для вашего оператора:*\n`;
-    message += `═══════════════════════════\n\n`;
+const formatAllConfigs = (profiles) => {
+    let message = `*📱 Выберите конфигурацию для вашего оператора:*\n\n`;
 
     profiles.forEach((profile, index) => {
-        message += `*${index + 1}. ${profile.name}* (Порт ${profile.port})\n`;
-        message += `${profile.comment}\n`;
-        message += `SNI: ${profile.sni}\n\n`;
+        message += `*${index + 1}. ${profile.name}*\n`;
+        message += `${profile.comment}\n\n`;
     });
 
     return message;
@@ -162,7 +156,7 @@ const handleGetConfig = async (msg) => {
         ]);
 
         // Отправляем сообщение с выбором
-        await bot.sendMessage(chatId, formatAllConfigs(uuid, allProfiles), {
+        await bot.sendMessage(chatId, formatAllConfigs(allProfiles), {
             parse_mode: 'Markdown',
             reply_markup: {
                 inline_keyboard: keyboard
@@ -177,17 +171,10 @@ const handleGetConfig = async (msg) => {
 bot.onText(/\/config/, handleGetConfig);
 
 bot.onText(/\/info/, (msg) => {
-    let infoMessage = `*📡 Server Information*\n\n`;
-    infoMessage += `*Server:* ${SERVER_IP}\n`;
-    infoMessage += `*Protocol:* VLESS + REALITY\n`;
-    infoMessage += `*Flow:* xtls-rprx-vision\n\n`;
-    infoMessage += `*Доступные порты и SNI:*\n`;
-    infoMessage += `═══════════════════════════\n\n`;
+    let infoMessage = `*📡 Доступные конфигурации*\n\n`;
 
     operatorProfiles.forEach((profile, index) => {
         infoMessage += `${index + 1}. *${profile.name}*\n`;
-        infoMessage += `   Port: ${profile.port}\n`;
-        infoMessage += `   SNI: ${profile.sni}\n`;
         infoMessage += `   ${profile.comment}\n\n`;
     });
 
@@ -196,10 +183,9 @@ bot.onText(/\/info/, (msg) => {
 
 bot.onText(/\/stats/, (msg) => {
     bot.sendMessage(msg.chat.id,
-        `*Statistics*\n\n` +
-        `*Total Users:* ${users.size}\n` +
-        `*Configs Issued:* ${users.size}\n` +
-        `*Server:* ${SERVER_IP}`,
+        `*Статистика*\n\n` +
+        `*Всего пользователей:* ${users.size}\n` +
+        `*Выдано конфигураций:* ${users.size}`,
         { parse_mode: 'Markdown' });
 });
 
@@ -251,14 +237,10 @@ bot.on('callback_query', async (query) => {
             const allProfiles = generateAllVlessLinks(uuid);
 
             let message = `*📱 ВСЕ КОНФИГУРАЦИИ*\n\n`;
-            message += `*Server:* ${SERVER_IP}\n`;
-            message += `*UUID:* \`${uuid}\`\n\n`;
-            message += `═══════════════════════════\n\n`;
 
             allProfiles.forEach((profile, index) => {
                 message += `*${index + 1}. ${profile.name}*\n`;
-                message += `${profile.comment}\n`;
-                message += `Port: ${profile.port} | SNI: ${profile.sni}\n\n`;
+                message += `${profile.comment}\n\n`;
                 message += `\`${profile.link}\`\n\n`;
                 message += `───────────────────────────\n\n`;
             });
