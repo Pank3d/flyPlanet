@@ -266,7 +266,7 @@ jobs:
                       "xver": 0,
                       "serverNames": ["yandex.ru", "ya.ru", "passport.yandex.ru", "disk.yandex.ru"],
                       "privateKey": "$PRIVATE_KEY",
-                      "shortIds": ["", "a1b2c3d4"]
+                      "shortIds": ["", "$SHORT_ID"]
                     }
                   }
                 },
@@ -287,7 +287,7 @@ jobs:
                       "xver": 0,
                       "serverNames": ["vk.com", "vk.ru", "userapi.com", "vk.me"],
                       "privateKey": "$PRIVATE_KEY",
-                      "shortIds": ["", "e5f6g7h8"]
+                      "shortIds": ["", "$SHORT_ID"]
                     }
                   }
                 },
@@ -308,7 +308,7 @@ jobs:
                       "xver": 0,
                       "serverNames": ["mail.ru", "e.mail.ru", "cloud.mail.ru", "my.mail.ru"],
                       "privateKey": "$PRIVATE_KEY",
-                      "shortIds": ["", "i9j0k1l2"]
+                      "shortIds": ["", "$SHORT_ID"]
                     }
                   }
                 },
@@ -329,7 +329,7 @@ jobs:
                       "xver": 0,
                       "serverNames": ["ok.ru", "www.ok.ru", "m.ok.ru"],
                       "privateKey": "$PRIVATE_KEY",
-                      "shortIds": ["", "m3n4o5p6"]
+                      "shortIds": ["", "$SHORT_ID"]
                     }
                   }
                 },
@@ -350,7 +350,7 @@ jobs:
                       "xver": 0,
                       "serverNames": ["rutube.ru", "www.rutube.ru"],
                       "privateKey": "$PRIVATE_KEY",
-                      "shortIds": ["", "q7r8s9t0"]
+                      "shortIds": ["", "$SHORT_ID"]
                     }
                   }
                 }
