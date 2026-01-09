@@ -1,0 +1,1 @@
+{"version":3,"file":"sendPhoto.js","sourceRoot":"","sources":["../../../src/helpers/bot/sendPhoto.ts"],"names":[],"mappings":"AAEA,MAAM,CAAC,MAAM,YAAY,GAAG,KAAK,EAC/B,GAAgB,EAChB,MAAuB,EACvB,KAAsB,EACtB,OAAsC,EACtC,EAAE;IACF,OAAO,MAAM,GAAG,CAAC,SAAS,CAAC,MAAM,EAAE,KAAK,EAAE,OAAO,CAAC,CAAC;AACrD,CAAC,CAAC"}

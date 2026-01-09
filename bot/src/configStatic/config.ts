@@ -1,4 +1,4 @@
-import { ProfilesType } from "./types";
+import { ProfilesType } from "./types.js";
 
 export const operatorProfiles: ProfilesType[] = [
   {

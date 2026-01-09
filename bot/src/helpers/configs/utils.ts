@@ -1,4 +1,4 @@
-import { VlessLinkResult } from "../vless/types";
+import { VlessLinkResult } from "../vless/types.js";
 
 export const formatConfigForOperator = (
   profileData: VlessLinkResult

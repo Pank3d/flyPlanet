@@ -1,7 +1,7 @@
-import { operatorProfiles } from "../../configStatic/config";
-import { ProfilesType } from "../../configStatic/types";
+import { operatorProfiles } from "../../configStatic/config.js";
+import { ProfilesType } from "../../configStatic/types.js";
 import dotenv from "dotenv";
-import { VlessLinkResult } from "./types";
+import { VlessLinkResult } from "./types.js";
 
 dotenv.config();
 
@@ -41,7 +41,7 @@ export const generateVlessLink = (
 };
 
 export const generateAllVlessLinks = (uuid: string): VlessLinkResult[] => {
-  return operatorProfiles.map((profile) => ({
+  return operatorProfiles.map((profile: ProfilesType) => ({
     name: profile.name,
     comment: profile.comment,
     port: profile.port,
