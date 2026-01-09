@@ -107,17 +107,33 @@ class RealityDeployer:
         """Настройка фаерволла для множественных портов"""
         print("\n[STEP 2] Настройка фаерволла...")
 
-        # Порты для открытия
-        ports = [443, 8443, 2053, 2083, 2087] if multi_port else [443]
+        # Порты для открытия (SSH + порты для VPN)
+        ports = [22, 443, 8443, 2053, 2083, 2087] if multi_port else [22, 443]
 
         # Проверяем UFW
         output, code = self.ssh_command("which ufw")
         if code == 0 and output.strip():
+            # КРИТИЧНО: Сначала разрешаем SSH (порт 22), чтобы не потерять доступ
+            print("[CRITICAL] Разрешаем SSH порт 22 ПЕРВЫМ для защиты от блокировки...")
+            self.ssh_command("ufw allow 22/tcp")
+            print("  ✓ Порт 22/tcp (SSH) разрешен - соединение защищено")
+
+            # Теперь разрешаем остальные порты
             for port in ports:
-                self.ssh_command(f"ufw allow {port}/tcp")
-                print(f"  - Порт {port}/tcp разрешен")
+                if port != 22:  # Пропускаем 22, так как уже разрешили
+                    self.ssh_command(f"ufw allow {port}/tcp")
+                    print(f"  - Порт {port}/tcp разрешен")
+
+            # Включаем UFW только после того, как SSH разрешен
             self.ssh_command("echo 'y' | ufw enable")
             print("[OK] UFW настроен")
+
+            # Проверяем что SSH точно разрешен
+            output, _ = self.ssh_command("ufw status | grep 22")
+            if "22" in output:
+                print("[OK] Проверка: SSH порт 22 подтвержден в правилах UFW")
+            else:
+                print("[WARNING] SSH порт 22 не найден в правилах UFW!")
         else:
             # iptables как запасной вариант
             for port in ports:

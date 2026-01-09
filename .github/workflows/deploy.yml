@@ -115,18 +115,34 @@ jobs:
             echo ""
             echo "=== Configuring Firewall for Multiple Ports ==="
 
-            # Порты для открытия (5 профилей)
-            PORTS="443 8443 2053 2083 2087"
+            # Порты для открытия (SSH + 5 профилей)
+            PORTS="22 443 8443 2053 2083 2087"
 
             # Проверяем UFW
             if command -v ufw &> /dev/null; then
               echo "Configuring UFW..."
+
+              # КРИТИЧНО: Сначала разрешаем SSH (порт 22), чтобы не потерять доступ
+              echo "CRITICAL: Allowing SSH port 22 FIRST to prevent lockout..."
+              ufw allow 22/tcp
+              echo "  ✓ Port 22/tcp (SSH) allowed - connection secured"
+
+              # Теперь разрешаем остальные порты
               for port in $PORTS; do
-                ufw allow $port/tcp
-                echo "  - Port $port/tcp allowed"
+                if [ "$port" != "22" ]; then
+                  ufw allow $port/tcp
+                  echo "  - Port $port/tcp allowed"
+                fi
               done
+
+              # Включаем UFW только после того, как SSH разрешен
               echo 'y' | ufw enable
               echo "UFW configured"
+
+              # Проверяем что SSH точно разрешен
+              echo ""
+              echo "Verifying SSH port 22 is allowed:"
+              ufw status | grep 22 || echo "WARNING: SSH port not found in UFW rules!"
             else
               echo "UFW not found, using iptables..."
               # Устанавливаем iptables если не установлен
