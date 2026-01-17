@@ -292,27 +292,6 @@ jobs:
                   }
                 },
                 {
-                  "port": 2053,
-                  "protocol": "vless",
-                  "tag": "inbound-2053",
-                  "settings": {
-                    "clients": [{"id": "$UUID", "flow": "xtls-rprx-vision"}],
-                    "decryption": "none"
-                  },
-                  "streamSettings": {
-                    "network": "tcp",
-                    "security": "reality",
-                    "realitySettings": {
-                      "show": false,
-                      "dest": "mail.ru:443",
-                      "xver": 0,
-                      "serverNames": ["mail.ru", "e.mail.ru", "cloud.mail.ru", "my.mail.ru"],
-                      "privateKey": "$PRIVATE_KEY",
-                      "shortIds": ["", "$SHORT_ID"]
-                    }
-                  }
-                },
-                {
                   "port": 2083,
                   "protocol": "vless",
                   "tag": "inbound-2083",

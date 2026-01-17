@@ -1,7 +1,5 @@
 import TelegramBot from "node-telegram-bot-api";
-import { operatorProfiles } from "../configStatic/config.js";
 import { generateAllVlessLinks } from "../helpers/vless/utils.js";
-import { formatAllConfigs } from "../helpers/configs/utils.js";
 import {
   botSendMessage,
   botDeleteMessage,
@@ -19,7 +17,7 @@ export const configCommand = async (
   const statusMsg = await botSendMessage(
     bot,
     chatId,
-    "Generating configurations..."
+    "Генерация конфигурации..."
   );
 
   try {
@@ -27,21 +25,15 @@ export const configCommand = async (
     const allProfiles = generateAllVlessLinks(uuid);
     await botDeleteMessage(bot, chatId, statusMsg.message_id);
 
-    const keyboard = operatorProfiles.map((profile, index) => [
-      {
-        text: profile.comment,
-        callback_data: `profile_${index}`,
-      },
-    ]);
+    // Выдаём только первый (единственный) конфиг
+    const config = allProfiles[0];
+    const message = `*${config.comment}*\n\n\`${config.link}\``;
 
-    await botSendMessage(bot, chatId, formatAllConfigs(allProfiles), {
+    await botSendMessage(bot, chatId, message, {
       parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: keyboard,
-      },
     });
   } catch (error) {
     console.error("Error:", error);
-    botSendMessage(bot, chatId, "Error generating config. Try again later.");
+    botSendMessage(bot, chatId, "Ошибка генерации конфига. Попробуйте позже.");
   }
 };
