@@ -8,7 +8,7 @@ const SHORT_ID = process.env.SHORT_ID || "";
 export const operatorProfiles: ProfilesType[] = [
   {
     port: 443,
-    sni: "www.eh.vk.com",
+    sni: "vk.com",
     shortId: SHORT_ID,
     name: "ВСЁ-ОБХОД",
     comment: "ВСЁ-ОБХОД",
