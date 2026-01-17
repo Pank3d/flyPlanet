@@ -88,8 +88,8 @@ jobs:
             UUID=$(xray uuid)
             echo "UUID: $UUID"
 
-            # Хардкодим Short ID
-            SHORT_ID="68"
+            # Генерация Short ID
+            SHORT_ID=$(openssl rand -hex 4)
             echo "Short ID: $SHORT_ID"
 
             # Создаем директорию для логов
